@@ -88,8 +88,6 @@ static const sph_u64 IV512[8] = {
 
 #endif
 
-#if SPH_COMPACT_BLAKE_32 || SPH_COMPACT_BLAKE_64
-
 static const unsigned sigma[16][16] = {
 	{  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 },
 	{ 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 },
@@ -121,7 +119,6 @@ static const unsigned sigma[16][16] = {
   6 15 14  9 11  3  0  8 12  2 13  7  1  4 10  5
  10  2  8  4  7  6  1  5 15 11  9 14  3 12 13  0
 */
-#endif
 
 #define Z00   0
 #define Z01   1
