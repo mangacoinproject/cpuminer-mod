@@ -5,7 +5,7 @@
 
 #include "crypto/blake2s.h"
 
-inline void blake2s_hash(void *output, const void *input)
+void blake2s_hash(void *output, const void *input)
 {
 	unsigned char hash[128] = { 0 };
 	blake2s_state blake2_ctx;
