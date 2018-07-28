@@ -161,6 +161,7 @@ Credits
 CPUMiner-multi was forked from pooler's CPUMiner, and has been started by Lucas Jones.
 * [tpruvot](https://github.com/tpruvot) added all the recent features and newer algorythmns
 * [Wolf9466](https://github.com/wolf9466) helped with Intel AES-NI support for CryptoNight
+* [No.255] (https://askmona.org/9245)  cpuminer-mod-r9 creator.
 
 License
 =======
