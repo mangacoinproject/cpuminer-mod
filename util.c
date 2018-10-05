@@ -2234,3 +2234,12 @@ void print_hash_tests(void)
 	free(scratchbuf);
 }
 
+void memrev(unsigned char *p, size_t len)
+{
+	unsigned char c, *q;
+	for (q = p + len - 1; p < q; p++, q--) {
+		c = *p;
+		*p = *q;
+		*q = c;
+	}
+}

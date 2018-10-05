@@ -698,8 +698,21 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	bool submit_coinbase = false;
 	bool version_force = false;
 	bool version_reduce = false;
+	bool segwit = false;
 	json_t *tmp, *txa;
 	bool rc = false;
+
+	tmp = json_object_get(val, "rules");
+	if (tmp && json_is_array(tmp)) {
+		n = json_array_size(tmp);
+		for (i = 0; i < n; i++) {
+			const char *s = json_string_value(json_array_get(tmp, i));
+			if (!s)
+				continue;
+			if (!strcmp(s, "segwit") || !strcmp(s, "!segwit"))
+				segwit = true;
+		}
+	}
 
 	tmp = json_object_get(val, "mutable");
 	if (tmp && json_is_array(tmp)) {
@@ -850,13 +863,32 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 
 		le32enc((uint32_t *)(cbtx+cbtx_size), 0xffffffff); /* sequence */
 		cbtx_size += 4;
-		cbtx[cbtx_size++] = 1; /* out-counter */
+		cbtx[cbtx_size++] = segwit ? 2 : 1; /* out-counter */
 		le32enc((uint32_t *)(cbtx+cbtx_size), (uint32_t)cbvalue); /* value */
 		le32enc((uint32_t *)(cbtx+cbtx_size+4), cbvalue >> 32);
 		cbtx_size += 8;
 		cbtx[cbtx_size++] = (uint8_t) pk_script_size; /* txout-script length */
 		memcpy(cbtx+cbtx_size, pk_script, pk_script_size);
 		cbtx_size += (int) pk_script_size;
+		if (segwit) {
+			const char *defwc = json_string_value(json_object_get(val, "default_witness_commitment"));
+			const int defwc_size = defwc ? (int)(strlen(defwc) / 2) : 0;
+			unsigned char *comtmt = (uchar*)malloc(defwc_size);
+			if (!defwc || !hex2bin(comtmt, defwc, defwc_size)) {
+				applog(LOG_ERR, "JSON invalid default_witness_commitment");
+				free(comtmt);
+				goto out;
+			}
+
+			memset(cbtx + cbtx_size, 0, 8); /* value */
+			cbtx_size += 8;
+			cbtx[cbtx_size++] = 38; /* txout-script length */
+			memcpy(cbtx + cbtx_size, comtmt, defwc_size);
+			cbtx_size += defwc_size;
+
+			free(comtmt);
+			
+		}
 		le32enc((uint32_t *)(cbtx+cbtx_size), 0); /* lock time */
 		cbtx_size += 4;
 		coinbase_append = true;
@@ -919,13 +951,24 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		tmp = json_array_get(txa, i);
 		const char *tx_hex = json_string_value(json_object_get(tmp, "data"));
 		const int tx_size = tx_hex ? (int) (strlen(tx_hex) / 2) : 0;
-		unsigned char *tx = (uchar*) malloc(tx_size);
-		if (!tx_hex || !hex2bin(tx, tx_hex, tx_size)) {
-			applog(LOG_ERR, "JSON invalid transactions");
-			free(tx);
-			goto out;
+		if (segwit) {
+			const char *txid = json_string_value(json_object_get(tmp, "txid"));
+			if (!txid || !hex2bin(merkle_tree[1 + i], txid, 32)) {
+				applog(LOG_ERR, "JSON invalid transaction txid");
+				goto out;
+			}
+			memrev(merkle_tree[1 + i], 32);
 		}
-		sha256d(merkle_tree[1 + i], tx, tx_size);
+		else {
+			unsigned char *tx = malloc(tx_size);
+			if (!tx_hex || !hex2bin(tx, tx_hex, tx_size)) {
+				applog(LOG_ERR, "JSON invalid transactions");
+				free(tx);
+				goto out;
+			}
+			sha256d(merkle_tree[1 + i], tx, tx_size);
+			free(tx);
+		}
 		if (!submit_coinbase)
 			strcat(work->txs, tx_hex);
 	}
@@ -1304,16 +1347,17 @@ static const char *getwork_req =
 	"{\"method\": \"getwork\", \"params\": [], \"id\":0}\r\n";
 
 #define GBT_CAPABILITIES "[\"coinbasetxn\", \"coinbasevalue\", \"longpoll\", \"workid\"]"
+#define GBT_RULES "[\"segwit\"]"
 
 static const char *gbt_req =
 	"{\"method\": \"getblocktemplate\", \"params\": [{\"capabilities\": "
-	GBT_CAPABILITIES "}], \"id\":0}\r\n";
+	GBT_CAPABILITIES ", \"rules\": " GBT_RULES "}], \"id\":0}\r\n";
 static const char *gbt_segwit_req =
 	"{\"method\": \"getblocktemplate\", \"params\": [{\"capabilities\": "
 	GBT_CAPABILITIES ", \"rules\":[\"segwit\"]}], \"id\":0}\r\n";
 static const char *gbt_lp_req =
 	"{\"method\": \"getblocktemplate\", \"params\": [{\"capabilities\": "
-	GBT_CAPABILITIES ", \"longpollid\": \"%s\"}], \"id\":0}\r\n";
+	GBT_CAPABILITIES ", \"rules\": " GBT_RULES ", \"longpollid\": \"%s\"}], \"id\":0}\r\n";
 static const char *gbt_segwit_lp_req =
 	"{\"method\": \"getblocktemplate\", \"params\": [{\"capabilities\": "
 	GBT_CAPABILITIES ", \"rules\":[\"segwit\"] ,\"longpollid\": \"%s\"}], \"id\":0}\r\n";

@@ -517,5 +517,6 @@ void zr5hash(void *output, const void *input);
 void yescrypthash(void *output, const void *input);
 void zr5hash_pok(void *output, uint32_t *pdata);
 
+void memrev(unsigned char *p, size_t len);
 
 #endif /* __MINER_H__ */
